@@ -31,18 +31,44 @@ export type Generation = {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const TOKEN_KEY = "prezlab_token";
+const EMAIL_KEY = "prezlab_email";
+const REMEMBER_KEY = "prezlab_remember";
 
 export function getToken() {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("prezlab_token");
+  return window.localStorage.getItem(TOKEN_KEY) || window.sessionStorage.getItem(TOKEN_KEY);
 }
 
-export function setToken(token: string) {
-  window.localStorage.setItem("prezlab_token", token);
+export function setToken(token: string, remember = true) {
+  const durableStorage = remember ? window.localStorage : window.sessionStorage;
+  const otherStorage = remember ? window.sessionStorage : window.localStorage;
+  otherStorage.removeItem(TOKEN_KEY);
+  durableStorage.setItem(TOKEN_KEY, token);
+  window.localStorage.setItem(REMEMBER_KEY, remember ? "true" : "false");
 }
 
 export function clearToken() {
-  window.localStorage.removeItem("prezlab_token");
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.sessionStorage.removeItem(TOKEN_KEY);
+}
+
+export function getRememberedEmail() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(EMAIL_KEY) || "";
+}
+
+export function setRememberedEmail(email: string, remember: boolean) {
+  if (remember) {
+    window.localStorage.setItem(EMAIL_KEY, email);
+  } else {
+    window.localStorage.removeItem(EMAIL_KEY);
+  }
+}
+
+export function shouldRememberLogin() {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem(REMEMBER_KEY) !== "false";
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
