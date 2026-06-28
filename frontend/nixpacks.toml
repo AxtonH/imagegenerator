@@ -1,2 +1,2 @@
 [start]
-cmd = "npm run start"
+cmd = "sh start.sh"

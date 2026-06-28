@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start"
+  }
+}
