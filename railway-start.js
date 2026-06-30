@@ -19,16 +19,30 @@ function findPython() {
   throw new Error("Python was not found. Railway must install python312.");
 }
 
-function run(command, args, options = {}) {
+function tryRun(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: "inherit", ...options });
-  if (result.status !== 0) {
-    throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status}`);
-  }
+  return result.status === 0;
 }
 
 function hasUvicorn(pythonBin) {
   const result = spawnSync(pythonBin, ["-c", "import uvicorn"], { stdio: "ignore" });
   return result.status === 0;
+}
+
+function installBackendDependencies(pythonBin) {
+  const requirements = path.join("backend", "requirements.txt");
+  const attempts = [
+    [pythonBin, ["-m", "pip", "install", "-r", requirements]],
+    ["pip", ["install", "-r", requirements]],
+    ["pip3", ["install", "-r", requirements]],
+  ];
+
+  for (const [command, args] of attempts) {
+    log(`Trying backend dependency install with: ${command} ${args.join(" ")}`);
+    if (tryRun(command, args, { cwd: rootDir })) return;
+  }
+
+  throw new Error("Could not install backend dependencies because pip is unavailable.");
 }
 
 async function waitForBackend(processHandle) {
@@ -60,7 +74,7 @@ async function main() {
 
   if (!hasUvicorn(pythonBin)) {
     log("Installing backend dependencies");
-    run(pythonBin, ["-m", "pip", "install", "-r", path.join("backend", "requirements.txt")], { cwd: rootDir });
+    installBackendDependencies(pythonBin);
   }
 
   log("Starting FastAPI backend");

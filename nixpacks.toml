@@ -1,10 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "python312"]
+nixPkgs = ["nodejs_22", "python312", "python312Packages.pip", "python312Packages.setuptools", "python312Packages.wheel"]
 
 [phases.install]
 cmds = [
-  "python -m pip install --upgrade pip",
-  "python -m pip install -r backend/requirements.txt",
+  "pip install -r backend/requirements.txt",
   "npm --prefix frontend ci"
 ]
 

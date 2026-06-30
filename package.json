@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "install:backend": "python -m pip install -r backend/requirements.txt || python3 -m pip install -r backend/requirements.txt",
+    "install:backend": "pip install -r backend/requirements.txt || pip3 install -r backend/requirements.txt || python -m pip install -r backend/requirements.txt || python3 -m pip install -r backend/requirements.txt",
     "build": "npm run install:backend && npm --prefix frontend ci && npm --prefix frontend run build",
     "start": "node railway-start.js"
   }
