@@ -1,7 +1,7 @@
 from io import BytesIO
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from PIL import Image
 import requests
 from .auth import create_access_token, get_current_profile, require_admin
@@ -38,14 +38,19 @@ def health() -> dict:
     return {"status": "ok"}
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": f"Server error: {exc}"})
+
+
 @app.post("/auth/login", response_model=LoginResponse)
 def login(
     body: LoginRequest,
-    settings: Settings = Depends(get_settings),
-    odoo: OdooClient = Depends(get_odoo_client),
-    supabase: SupabaseService = Depends(get_supabase_service),
 ) -> LoginResponse:
     try:
+        settings = get_settings()
+        odoo = OdooClient(settings)
+        supabase = SupabaseService(settings)
         odoo_user = odoo.verify_user(body.email, body.password)
         profile = supabase.upsert_profile_from_odoo(odoo_user)
         supabase.log_event(profile["id"], "login", metadata={"email": profile["email"]})

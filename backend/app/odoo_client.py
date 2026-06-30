@@ -26,15 +26,26 @@ class OdooClient:
         if not uid:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Odoo credentials")
 
-        users = self.models.execute_kw(
-            self.settings.odoo_db,
-            uid,
-            password,
-            "res.users",
-            "read",
-            [[uid]],
-            {"fields": ["id", "name", "login", "email", "active", "employee_id"]},
-        )
+        try:
+            users = self.models.execute_kw(
+                self.settings.odoo_db,
+                uid,
+                password,
+                "res.users",
+                "read",
+                [[uid]],
+                {"fields": ["id", "name", "login", "email", "active", "employee_id"]},
+            )
+        except xmlrpc.client.Fault:
+            users = self.models.execute_kw(
+                self.settings.odoo_db,
+                uid,
+                password,
+                "res.users",
+                "read",
+                [[uid]],
+                {"fields": ["id", "name", "login", "email", "active"]},
+            )
         if not users:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Odoo user not found")
 
@@ -43,19 +54,23 @@ class OdooClient:
         department = None
         job_title = None
         if employee_id:
-            employees = self.models.execute_kw(
-                self.settings.odoo_db,
-                uid,
-                password,
-                "hr.employee",
-                "read",
-                [[employee_id]],
-                {"fields": ["department_id", "job_title"]},
-            )
-            if employees:
-                employee = employees[0]
-                department = employee.get("department_id")[1] if employee.get("department_id") else None
-                job_title = employee.get("job_title")
+            try:
+                employees = self.models.execute_kw(
+                    self.settings.odoo_db,
+                    uid,
+                    password,
+                    "hr.employee",
+                    "read",
+                    [[employee_id]],
+                    {"fields": ["department_id", "job_title"]},
+                )
+                if employees:
+                    employee = employees[0]
+                    department = employee.get("department_id")[1] if employee.get("department_id") else None
+                    job_title = employee.get("job_title")
+            except xmlrpc.client.Fault:
+                department = None
+                job_title = None
 
         return OdooUser(
             odoo_user_id=user["id"],
