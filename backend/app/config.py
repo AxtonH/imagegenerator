@@ -1,4 +1,7 @@
 from functools import lru_cache
+from typing import Any
+from urllib.parse import urlparse
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +30,27 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = ""
 
     default_monthly_generation_limit: int = 100
+
+    @field_validator("supabase_url", mode="before")
+    @classmethod
+    def normalize_supabase_url(cls, value: Any) -> str:
+        url = cls._clean_url(value)
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return url
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    @field_validator("odoo_url", mode="before")
+    @classmethod
+    def normalize_odoo_url(cls, value: Any) -> str:
+        return cls._clean_url(value).rstrip("/")
+
+    @staticmethod
+    def _clean_url(value: Any) -> str:
+        url = str(value or "").strip().strip('"').strip("'")
+        if "](" in url and url.endswith(")"):
+            url = url.split("](", 1)[1].rstrip(")")
+        return url.strip().strip('"').strip("'")
 
     @property
     def cors_origins(self) -> list[str]:
