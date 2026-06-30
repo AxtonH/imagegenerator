@@ -1,6 +1,7 @@
 from functools import lru_cache
+import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -35,6 +36,11 @@ class Settings(BaseSettings):
     @classmethod
     def normalize_supabase_url(cls, value: Any) -> str:
         url = cls._clean_url(value)
+        supabase_host = re.search(r"([a-z0-9-]+\.supabase\.co)", url, re.IGNORECASE)
+        if supabase_host:
+            return f"https://{supabase_host.group(1).lower()}"
+        if url and not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
         parsed = urlparse(url)
         if not parsed.scheme or not parsed.netloc:
             return url
@@ -47,10 +53,10 @@ class Settings(BaseSettings):
 
     @staticmethod
     def _clean_url(value: Any) -> str:
-        url = str(value or "").strip().strip('"').strip("'")
+        url = unquote(str(value or "")).strip().strip("<>").strip().strip('"').strip("'")
         if "](" in url and url.endswith(")"):
             url = url.split("](", 1)[1].rstrip(")")
-        return url.strip().strip('"').strip("'")
+        return url.strip().strip("<>").strip().strip('"').strip("'")
 
     @property
     def cors_origins(self) -> list[str]:

@@ -1,5 +1,6 @@
 from io import BytesIO
 import logging
+from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -99,10 +100,11 @@ def login(
         if not profile:
             raise RuntimeError("Supabase returned no profile after upsert")
     except Exception as exc:
-        logger.exception("Login failed while syncing Supabase profile for %s", body.email)
+        supabase_host = urlparse(settings.supabase_url).netloc or settings.supabase_url
+        logger.exception("Login failed while syncing Supabase profile for %s via %s", body.email, supabase_host)
         raise HTTPException(
             status_code=502,
-            detail=f"Login failed while syncing Supabase profile: {exc}",
+            detail=f"Login failed while syncing Supabase profile via {supabase_host}: {exc}",
         ) from exc
 
     try:
