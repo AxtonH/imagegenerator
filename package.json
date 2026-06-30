@@ -1,8 +1,8 @@
 {
   "private": true,
   "scripts": {
-    "install:backend": "pip install -r backend/requirements.txt || pip3 install -r backend/requirements.txt || python -m pip install -r backend/requirements.txt || python3 -m pip install -r backend/requirements.txt",
-    "build": "npm run install:backend && npm --prefix frontend ci && npm --prefix frontend run build",
+    "install:backend": "python -m venv .venv && .venv\\Scripts\\python.exe -m pip install -r backend/requirements.txt",
+    "build": "npm --prefix frontend run build",
     "start": "node railway-start.js"
   }
 }

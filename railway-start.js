@@ -6,13 +6,17 @@ const backendDir = path.join(rootDir, "backend");
 const frontendDir = path.join(rootDir, "frontend");
 const backendUrl = process.env.INTERNAL_API_URL || "http://127.0.0.1:8000";
 const backendPort = "8000";
+const isWindows = process.platform === "win32";
+const venvDir = path.join(rootDir, ".venv");
+const venvPython = path.join(venvDir, isWindows ? "Scripts\\python.exe" : "bin/python");
+const venvPip = path.join(venvDir, isWindows ? "Scripts\\pip.exe" : "bin/pip");
 
 function log(message) {
   console.log(`[railway-start] ${message}`);
 }
 
 function findPython() {
-  for (const candidate of ["python", "python3"]) {
+  for (const candidate of [process.env.PYTHON_BIN, venvPython, "python", "python3"].filter(Boolean)) {
     const check = spawnSync(candidate, ["--version"], { stdio: "ignore" });
     if (check.status === 0) return candidate;
   }
@@ -31,7 +35,14 @@ function hasUvicorn(pythonBin) {
 
 function installBackendDependencies(pythonBin) {
   const requirements = path.join("backend", "requirements.txt");
+  if (pythonBin !== venvPython) {
+    log("Creating local Python virtual environment");
+    tryRun(pythonBin, ["-m", "venv", venvDir], { cwd: rootDir });
+  }
+
   const attempts = [
+    [venvPython, ["-m", "pip", "install", "-r", requirements]],
+    [venvPip, ["install", "-r", requirements]],
     [pythonBin, ["-m", "pip", "install", "-r", requirements]],
     ["pip", ["install", "-r", requirements]],
     ["pip3", ["install", "-r", requirements]],

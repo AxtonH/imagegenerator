@@ -1,9 +1,10 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "python312", "python312Packages.pip", "python312Packages.setuptools", "python312Packages.wheel"]
+nixPkgs = ["nodejs_22", "python312", "python312Packages.virtualenv"]
 
 [phases.install]
 cmds = [
-  "pip install -r backend/requirements.txt",
+  "python -m virtualenv /app/.venv",
+  "/app/.venv/bin/pip install -r backend/requirements.txt",
   "npm --prefix frontend ci"
 ]
 
