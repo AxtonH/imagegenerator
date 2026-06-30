@@ -1,4 +1,5 @@
 from io import BytesIO
+import logging
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -19,6 +20,9 @@ from .schemas import (
     RefineImageRequest,
 )
 from .supabase_client import SupabaseService, get_supabase_service
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("prezlab-imagegen")
 
 app = FastAPI(title="Prezlab Image Generation API")
 
@@ -52,6 +56,7 @@ def health() -> dict:
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(status_code=500, content={"detail": f"Server error: {exc}"})
 
 
@@ -61,17 +66,55 @@ def login(
 ) -> LoginResponse:
     try:
         settings = get_settings()
+    except Exception as exc:
+        logger.exception("Login failed while loading settings")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Login failed while loading server configuration: {exc}",
+        ) from exc
+
+    try:
         odoo = OdooClient(settings)
         supabase = SupabaseService(settings)
+    except Exception as exc:
+        logger.exception("Login failed while creating backend clients")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Login failed while creating backend clients: {exc}",
+        ) from exc
+
+    try:
         odoo_user = odoo.verify_user(body.email, body.password)
-        profile = supabase.upsert_profile_from_odoo(odoo_user)
-        supabase.log_event(profile["id"], "login", metadata={"email": profile["email"]})
-        token = create_access_token(profile["id"], settings)
-        return LoginResponse(access_token=token, profile=profile)
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Login failed: {exc}") from exc
+        logger.exception("Login failed while verifying Odoo user %s", body.email)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Login failed while verifying Odoo user: {exc}",
+        ) from exc
+
+    try:
+        profile = supabase.upsert_profile_from_odoo(odoo_user)
+        if not profile:
+            raise RuntimeError("Supabase returned no profile after upsert")
+    except Exception as exc:
+        logger.exception("Login failed while syncing Supabase profile for %s", body.email)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Login failed while syncing Supabase profile: {exc}",
+        ) from exc
+
+    try:
+        supabase.log_event(profile["id"], "login", metadata={"email": profile["email"]})
+        token = create_access_token(profile["id"], settings)
+        return LoginResponse(access_token=token, profile=profile)
+    except Exception as exc:
+        logger.exception("Login failed while creating session for %s", body.email)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Login failed while creating session: {exc}",
+        ) from exc
 
 
 @app.get("/auth/me")
