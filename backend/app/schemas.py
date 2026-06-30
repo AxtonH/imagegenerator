@@ -3,7 +3,6 @@ from typing import Any, Literal
 from pydantic import BaseModel, EmailStr, Field
 
 
-AspectRatio = Literal["16:9", "1:1", "4:5", "9:16"]
 GenerationMode = Literal["Fast", "Premium", "Realistic", "Illustration"]
 ImageAction = Literal["download_image", "save_image", "favorite_image"]
 
@@ -21,7 +20,7 @@ class LoginResponse(BaseModel):
 
 class GenerateImageRequest(BaseModel):
     prompt: str = Field(min_length=3, max_length=4000)
-    aspect_ratio: AspectRatio
+    aspect_ratio: str = Field(min_length=3, max_length=64)
     variations: Literal[1, 2, 4]
     mode: GenerationMode
 

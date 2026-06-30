@@ -316,29 +316,6 @@ button {
   line-height: 1.45;
 }
 
-.template-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.template-button {
-  border: 1px solid var(--line);
-  background: #fff;
-  color: #344054;
-  min-height: 38px;
-  border-radius: 6px;
-  padding: 0 10px;
-  text-align: left;
-  font-size: 13px;
-}
-
-.template-button:hover {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-  background: var(--soft);
-}
-
 .segmented-control {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
@@ -357,6 +334,22 @@ button {
   color: #fff;
   border-color: var(--accent);
   background: var(--accent);
+}
+
+.custom-size-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.size-input {
+  display: grid;
+  gap: 6px;
+}
+
+.size-input span,
+.small-note {
+  font-size: 12px;
 }
 
 .progress-list {
@@ -671,7 +664,7 @@ th {
     padding: 18px;
   }
 
-  .template-row,
+  .custom-size-grid,
   .progress-list,
   .download-control {
     grid-template-columns: 1fr;

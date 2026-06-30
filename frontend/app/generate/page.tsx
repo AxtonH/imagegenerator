@@ -7,33 +7,12 @@ import { api, GeneratedImage, Generation } from "@/lib/api";
 
 type DownloadFormat = "png" | "jpeg" | "webp";
 type ProgressStep = "idle" | "limit" | "prompt" | "generate" | "save";
+type SizeMode = "preset" | "custom";
 
 const aspectRatios = ["16:9", "1:1", "4:5", "9:16"];
+const sizeModes: SizeMode[] = ["preset", "custom"];
 const modes = ["Fast", "Premium", "Realistic", "Illustration"];
 const variationOptions = [1, 2, 4];
-
-const templates = [
-  {
-    name: "Corporate interior",
-    prompt:
-      "A refined corporate interior for a strategic presentation setting, warm natural light, premium materials, calm confident atmosphere, no text or logos."
-  },
-  {
-    name: "Pitch deck visual",
-    prompt:
-      "A high-end abstract business visual for a consulting pitch deck, clear focal point, generous negative space for slide copy, polished editorial lighting."
-  },
-  {
-    name: "Product mockup",
-    prompt:
-      "A clean product mockup scene on a neutral premium surface, realistic shadows, controlled reflections, brand-safe composition, no visible logos."
-  },
-  {
-    name: "Editorial illustration",
-    prompt:
-      "A sophisticated editorial illustration about strategy, creativity, and transformation, balanced composition, refined color palette, presentation-ready."
-  }
-];
 
 const progressLabels: Record<ProgressStep, string> = {
   idle: "Ready",
@@ -45,7 +24,10 @@ const progressLabels: Record<ProgressStep, string> = {
 
 export default function GeneratePage() {
   const [prompt, setPrompt] = useState("");
+  const [sizeMode, setSizeMode] = useState<"preset" | "custom">("preset");
   const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [customWidth, setCustomWidth] = useState(1920);
+  const [customHeight, setCustomHeight] = useState(1080);
   const [variations, setVariations] = useState(1);
   const [mode, setMode] = useState("Fast");
   const [generation, setGeneration] = useState<Generation | null>(null);
@@ -60,6 +42,7 @@ export default function GeneratePage() {
   const refinementRef = useRef<HTMLTextAreaElement | null>(null);
 
   const cost = useMemo(() => Number(generation?.estimated_cost || 0).toFixed(2), [generation]);
+  const selectedSize = sizeMode === "custom" ? `Custom ${customWidth}x${customHeight} px` : aspectRatio;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -71,7 +54,7 @@ export default function GeneratePage() {
       setProgress("prompt");
       await pause(250);
       setProgress("generate");
-      const result = await api.generate({ prompt, aspect_ratio: aspectRatio, variations, mode });
+      const result = await api.generate({ prompt, aspect_ratio: selectedSize, variations, mode });
       setProgress("save");
       setGeneration(result.generation);
       setImages(result.images);
@@ -112,7 +95,7 @@ export default function GeneratePage() {
         parent_image_id: selectedImage.id,
         prompt,
         refinement_prompt: refinementPrompt,
-        aspect_ratio: aspectRatio,
+        aspect_ratio: selectedSize,
         variations,
         mode
       });
@@ -139,7 +122,7 @@ export default function GeneratePage() {
   function enhancePrompt() {
     const additions = [
       "Style: polished, high-end, presentation-ready.",
-      `Composition: ${aspectRatio} layout with a clear focal point and controlled negative space.`,
+      `Composition: ${selectedSize} layout with a clear focal point and controlled negative space.`,
       "Lighting: refined professional lighting with natural depth.",
       "Avoid: confidential details, client logos, distorted text, clutter, and unrealistic hands."
     ];
@@ -177,15 +160,41 @@ export default function GeneratePage() {
             <div className="warning">Do not include confidential client information unless approved.</div>
           </div>
 
-          <div className="template-row">
-            {templates.map((template) => (
-              <button className="template-button" key={template.name} onClick={() => setPrompt(template.prompt)} type="button">
-                {template.name}
-              </button>
-            ))}
-          </div>
-
-          <SegmentedControl label="Aspect ratio" options={aspectRatios} value={aspectRatio} onChange={setAspectRatio} />
+          <SegmentedControl label="Size mode" options={sizeModes} value={sizeMode} onChange={setSizeMode} />
+          {sizeMode === "preset" ? (
+            <SegmentedControl label="Aspect ratio" options={aspectRatios} value={aspectRatio} onChange={setAspectRatio} />
+          ) : (
+            <div className="field">
+              <label>Custom size</label>
+              <div className="custom-size-grid">
+                <label className="size-input">
+                  <span>Width</span>
+                  <input
+                    className="input"
+                    min={256}
+                    max={4096}
+                    step={8}
+                    type="number"
+                    value={customWidth}
+                    onChange={(event) => setCustomWidth(clampDimension(event.target.value, 1920))}
+                  />
+                </label>
+                <label className="size-input">
+                  <span>Height</span>
+                  <input
+                    className="input"
+                    min={256}
+                    max={4096}
+                    step={8}
+                    type="number"
+                    value={customHeight}
+                    onChange={(event) => setCustomHeight(clampDimension(event.target.value, 1080))}
+                  />
+                </label>
+              </div>
+              <div className="muted small-note">Custom size is sent to Gemini as creative direction and saved with the generation.</div>
+            </div>
+          )}
           <SegmentedControl label="Variations" options={variationOptions} value={variations} onChange={setVariations} />
           <SegmentedControl label="Mode" options={modes} value={mode} onChange={setMode} />
 
@@ -247,7 +256,7 @@ export default function GeneratePage() {
             <div className="empty-state results-empty">
               <div>
                 <strong>No images yet</strong>
-                <p>Choose a template or write a prompt, then generate one to four variations.</p>
+                <p>Write a prompt, choose a preset ratio or custom size, then generate one to four variations.</p>
               </div>
             </div>
           )}
@@ -362,6 +371,12 @@ function ImageActions({
 
 function pause(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function clampDimension(value: string, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(4096, Math.max(256, Math.round(parsed)));
 }
 
 function shortId(id: string) {

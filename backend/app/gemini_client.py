@@ -28,7 +28,7 @@ class GeminiImageClient:
 
     def enhance_prompt(self, prompt: str, mode: str, aspect_ratio: str) -> str:
         return (
-            f"{MODE_PREFIX[mode]} Aspect ratio: {aspect_ratio}. "
+            f"{MODE_PREFIX[mode]} Target aspect ratio or size: {aspect_ratio}. "
             "Do not include confidential client information, logos, or private data unless explicitly supplied and approved. "
             f"User prompt: {prompt}"
         )
