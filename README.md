@@ -73,17 +73,9 @@ Open `http://localhost:3000`.
 
 ## Railway Deployment
 
-Deploy this repo as two Railway services from the same GitHub repository.
+This repo can deploy as **one Railway service** from the repository root. The service starts a private FastAPI process on `127.0.0.1:8000` and exposes the Next.js app on Railway's `$PORT`. Frontend API calls use same-origin routes and are proxied to FastAPI by `frontend/next.config.ts`.
 
-### Backend service
-
-Create a Railway service with root directory:
-
-```text
-backend
-```
-
-Set these environment variables in Railway:
+Set these environment variables in the single Railway service:
 
 ```text
 JWT_SECRET=
@@ -97,34 +89,25 @@ GEMINI_MODEL_REALISTIC=gemini-3-pro-image
 GEMINI_MODEL_ILLUSTRATION=gemini-2.5-flash-image
 ODOO_URL=https://prezlab.odoo.com
 ODOO_DB=odoo-ps-psae-prezlab-main-10779811
-CORS_ALLOWED_ORIGINS=https://your-frontend-service.up.railway.app
 DEFAULT_MONTHLY_GENERATION_LIMIT=100
 ```
 
-Railway will use `backend/nixpacks.toml` and run:
+Optional:
 
 ```text
-uvicorn app.main:app --host 0.0.0.0 --port $PORT
+INTERNAL_API_URL=http://127.0.0.1:8000
 ```
 
-### Frontend service
+Do not set `NEXT_PUBLIC_API_URL` for the single-service deployment. Leaving it unset makes the frontend call same-origin API routes like `/auth/login`.
 
-Create a second Railway service with root directory:
+Railway will use root `nixpacks.toml` and run:
 
 ```text
-frontend
+sh start.sh
 ```
 
-Set:
+Health check:
 
 ```text
-NEXT_PUBLIC_API_URL=https://your-backend-service.up.railway.app
+https://your-railway-url/health
 ```
-
-Railway will build Next.js and run:
-
-```text
-npm run start
-```
-
-After both services are deployed, update the backend `CORS_ALLOWED_ORIGINS` with the real Railway frontend URL.

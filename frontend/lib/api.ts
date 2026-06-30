@@ -30,7 +30,7 @@ export type Generation = {
   generated_images?: GeneratedImage[];
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 const TOKEN_KEY = "prezlab_token";
 const EMAIL_KEY = "prezlab_email";
 const REMEMBER_KEY = "prezlab_remember";
