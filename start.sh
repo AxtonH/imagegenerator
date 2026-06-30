@@ -39,6 +39,23 @@ for attempt in $(seq 1 30); do
 done
 
 cd ../frontend
-npm run start
+npm run start:next &
+NEXT_PID=$!
 
-kill "$BACKEND_PID"
+while true; do
+  if ! kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
+    echo "FastAPI backend stopped unexpectedly"
+    kill "$NEXT_PID" >/dev/null 2>&1 || true
+    wait "$BACKEND_PID" || true
+    exit 1
+  fi
+
+  if ! kill -0 "$NEXT_PID" >/dev/null 2>&1; then
+    wait "$NEXT_PID"
+    NEXT_STATUS=$?
+    kill "$BACKEND_PID" >/dev/null 2>&1 || true
+    exit "$NEXT_STATUS"
+  fi
+
+  sleep 5
+done
