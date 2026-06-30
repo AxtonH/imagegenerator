@@ -12,4 +12,4 @@ cmds = [
 cmds = ["npm --prefix frontend run build"]
 
 [start]
-cmd = "sh start.sh"
+cmd = "npm run start"
