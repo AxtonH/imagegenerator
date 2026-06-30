@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "cd .. && sh start.sh",
+    "start": "node ../railway-start.js",
     "start:next": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "next lint"
   },

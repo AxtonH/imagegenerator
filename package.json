@@ -3,6 +3,6 @@
   "scripts": {
     "install:backend": "python -m pip install -r backend/requirements.txt || python3 -m pip install -r backend/requirements.txt",
     "build": "npm run install:backend && npm --prefix frontend ci && npm --prefix frontend run build",
-    "start": "sh start.sh"
+    "start": "node railway-start.js"
   }
 }
