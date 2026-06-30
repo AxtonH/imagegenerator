@@ -45,11 +45,16 @@ def login(
     odoo: OdooClient = Depends(get_odoo_client),
     supabase: SupabaseService = Depends(get_supabase_service),
 ) -> LoginResponse:
-    odoo_user = odoo.verify_user(body.email, body.password)
-    profile = supabase.upsert_profile_from_odoo(odoo_user)
-    supabase.log_event(profile["id"], "login", metadata={"email": profile["email"]})
-    token = create_access_token(profile["id"], settings)
-    return LoginResponse(access_token=token, profile=profile)
+    try:
+        odoo_user = odoo.verify_user(body.email, body.password)
+        profile = supabase.upsert_profile_from_odoo(odoo_user)
+        supabase.log_event(profile["id"], "login", metadata={"email": profile["email"]})
+        token = create_access_token(profile["id"], settings)
+        return LoginResponse(access_token=token, profile=profile)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Login failed: {exc}") from exc
 
 
 @app.get("/auth/me")

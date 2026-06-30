@@ -83,14 +83,32 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
+    const message = await getErrorMessage(response, "Request failed");
     if (response.status === 401 && typeof window !== "undefined") {
       clearToken();
       window.location.href = "/login";
     }
-    throw new Error(body.detail || "Request failed");
+    throw new Error(message);
   }
   return response.json();
+}
+
+async function getErrorMessage(response: Response, fallback: string) {
+  const text = await response.text().catch(() => "");
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    if (typeof body.detail === "string") return body.detail;
+    if (Array.isArray(body.detail)) {
+      return body.detail.map((item: { msg?: string } | unknown) => {
+        return typeof item === "object" && item && "msg" in item ? String(item.msg) : JSON.stringify(item);
+      }).join("; ");
+    }
+    if (typeof body.message === "string") return body.message;
+  } catch {
+    return text.slice(0, 240);
+  }
+  return fallback;
 }
 
 export const api = {
@@ -136,12 +154,12 @@ export const api = {
       }
     });
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
+      const message = await getErrorMessage(response, "Download failed");
       if (response.status === 401 && typeof window !== "undefined") {
         clearToken();
         window.location.href = "/login";
       }
-      throw new Error(body.detail || "Download failed");
+      throw new Error(message);
     }
     return response.blob();
   },
