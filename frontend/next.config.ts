@@ -11,8 +11,8 @@ const nextConfig: NextConfig = {
       { source: "/refine-image", destination: `${apiUrl}/refine-image` },
       { source: "/image-action", destination: `${apiUrl}/image-action` },
       { source: "/download-image/:path*", destination: `${apiUrl}/download-image/:path*` },
-      { source: "/history", destination: `${apiUrl}/history` },
-      { source: "/admin/:path*", destination: `${apiUrl}/admin/:path*` }
+      { source: "/api/history", destination: `${apiUrl}/history` },
+      { source: "/api/admin/:path*", destination: `${apiUrl}/admin/:path*` }
     ];
   },
   images: {

@@ -182,7 +182,7 @@ export const api = {
     }
     return response.blob();
   },
-  history: () => request<{ generations: Generation[] }>("/history"),
+  history: () => request<{ generations: Generation[] }>("/api/history"),
   adminUsage: () =>
     request<{
       total_users: number;
@@ -194,5 +194,5 @@ export const api = {
       estimated_gemini_cost: number;
       recent_usage_events: Array<Record<string, any>>;
       users_near_limit: Array<Record<string, any>>;
-    }>("/admin/usage")
+    }>("/api/admin/usage")
 };
