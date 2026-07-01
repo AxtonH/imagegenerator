@@ -1,7 +1,7 @@
 from io import BytesIO
 import logging
 from urllib.parse import urlparse
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from PIL import Image
@@ -24,6 +24,8 @@ from .supabase_client import SupabaseService, get_supabase_service
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("prezlab-imagegen")
+ALLOWED_UPLOAD_TYPES = {"image/png", "image/jpeg", "image/webp"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 app = FastAPI(title="Prezlab Image Generation API")
 
@@ -151,6 +153,59 @@ def run_generation(
         raise HTTPException(status_code=500, detail="Image generation failed") from exc
 
 
+def run_image_edit(
+    request: GenerateImageRequest,
+    profile: dict,
+    supabase: SupabaseService,
+    gemini: GeminiImageClient,
+    image_bytes: bytes,
+    mime_type: str,
+    event_metadata: dict | None = None,
+) -> GenerationResponse:
+    user_id = profile["id"]
+    supabase.check_and_increment_usage(user_id)
+    model = gemini.model_for_mode(request.mode)
+    generation = None
+    try:
+        enhanced_prompt, image_bytes_list = gemini.edit_image(
+            request.prompt,
+            request.mode,
+            request.aspect_ratio,
+            request.variations,
+            image_bytes,
+            mime_type,
+        )
+        generation = supabase.create_generation(user_id, request, enhanced_prompt, model)
+        supabase.log_event(
+            user_id,
+            "generate_image",
+            generation["id"],
+            metadata={"mode": request.mode, **(event_metadata or {})},
+        )
+        images = [supabase.upload_image(user_id, generation["id"], item) for item in image_bytes_list]
+        generation = supabase.complete_generation(generation["id"], "completed")
+        supabase.log_cost(user_id, generation["id"], model, generation["estimated_cost"], {"variations": len(images), **(event_metadata or {})})
+        supabase.log_event(user_id, "generation_success", generation["id"], metadata={"images": len(images), **(event_metadata or {})})
+        return GenerationResponse(generation=generation, images=images)
+    except Exception as exc:
+        if generation:
+            supabase.complete_generation(generation["id"], "failed", str(exc))
+            supabase.log_event(user_id, "generation_failed", generation["id"], metadata={"error": str(exc), **(event_metadata or {})})
+        raise HTTPException(status_code=500, detail="Image edit failed") from exc
+
+
+async def read_uploaded_image(file: UploadFile) -> tuple[bytes, str]:
+    mime_type = file.content_type or ""
+    if mime_type not in ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(status_code=415, detail="Upload a PNG, JPEG, or WebP image")
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty")
+    if len(image_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded image must be 10MB or smaller")
+    return image_bytes, mime_type
+
+
 @app.post("/generate-image", response_model=GenerationResponse)
 def generate_image(
     body: GenerateImageRequest,
@@ -159,6 +214,33 @@ def generate_image(
     gemini: GeminiImageClient = Depends(get_gemini_client),
 ) -> GenerationResponse:
     return run_generation(body, profile, supabase, gemini)
+
+
+@app.post("/edit-image", response_model=GenerationResponse)
+async def edit_uploaded_image(
+    prompt: str = Form(..., min_length=3, max_length=4000),
+    aspect_ratio: str = Form(..., min_length=3, max_length=64),
+    variations: int = Form(...),
+    mode: str = Form(...),
+    image: UploadFile = File(...),
+    profile: dict = Depends(get_current_profile),
+    supabase: SupabaseService = Depends(get_supabase_service),
+    gemini: GeminiImageClient = Depends(get_gemini_client),
+) -> GenerationResponse:
+    try:
+        request = GenerateImageRequest(prompt=prompt, aspect_ratio=aspect_ratio, variations=variations, mode=mode)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    image_bytes, mime_type = await read_uploaded_image(image)
+    return run_image_edit(
+        request,
+        profile,
+        supabase,
+        gemini,
+        image_bytes,
+        mime_type,
+        {"source": "uploaded_image"},
+    )
 
 
 @app.post("/refine-image", response_model=GenerationResponse)
@@ -174,7 +256,24 @@ def refine_image(
         variations=body.variations,
         mode=body.mode,
     )
-    result = run_generation(combined, profile, supabase, gemini)
+    if body.parent_image_id:
+        parent_image = supabase.get_image(profile["id"], body.parent_image_id)
+        if not parent_image:
+            raise HTTPException(status_code=404, detail="Parent image not found")
+        source = requests.get(parent_image["image_url"], timeout=30)
+        source.raise_for_status()
+        mime_type = source.headers.get("content-type", "image/png").split(";")[0]
+        result = run_image_edit(
+            combined,
+            profile,
+            supabase,
+            gemini,
+            source.content,
+            mime_type if mime_type in ALLOWED_UPLOAD_TYPES else "image/png",
+            {"source": "generated_image_refinement", "parent_image_id": body.parent_image_id},
+        )
+    else:
+        result = run_generation(combined, profile, supabase, gemini)
     supabase.create_refinement(
         profile["id"],
         body.parent_generation_id,

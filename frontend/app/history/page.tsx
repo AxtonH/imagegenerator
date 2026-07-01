@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Download, Heart, RefreshCw, Save } from "lucide-react";
+import { Download, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { api, GeneratedImage, Generation } from "@/lib/api";
 
@@ -28,9 +28,9 @@ export default function HistoryPage() {
     load();
   }, []);
 
-  async function action(image: GeneratedImage, actionType: "download_image" | "save_image" | "favorite_image") {
-    await api.imageAction(image.id, actionType);
-    if (actionType === "download_image") window.open(image.image_url, "_blank", "noopener,noreferrer");
+  async function action(image: GeneratedImage) {
+    await api.imageAction(image.id, "download_image");
+    window.open(image.image_url, "_blank", "noopener,noreferrer");
     await load();
   }
 
@@ -83,9 +83,7 @@ export default function HistoryPage() {
                 <div className="image-card" key={image.id}>
                   <img alt="Generated output" src={image.image_url} />
                   <div className="image-actions">
-                    <button className="icon-button" title="Save" onClick={() => action(image, "save_image")} type="button"><Save size={18} /></button>
-                    <button className="icon-button" title="Favorite" onClick={() => action(image, "favorite_image")} type="button"><Heart size={18} /></button>
-                    <button className="icon-button" title="Download" onClick={() => action(image, "download_image")} type="button"><Download size={18} /></button>
+                    <button className="icon-button" title="Download" onClick={() => action(image)} type="button"><Download size={18} /></button>
                   </div>
                 </div>
               ))}

@@ -316,6 +316,47 @@ button {
   line-height: 1.45;
 }
 
+.file-input {
+  display: none;
+}
+
+.upload-dropzone {
+  min-height: 74px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: #fafbfc;
+  color: #344054;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.upload-dropzone:hover {
+  border-color: var(--accent);
+  background: var(--soft);
+  color: var(--accent-strong);
+}
+
+.source-image-preview {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fafbfc;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.source-image-preview img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  background: #eef0f3;
+  border-radius: 6px;
+}
+
 .segmented-control {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
@@ -441,7 +482,7 @@ button {
 
 .image-actions-expanded {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   padding: 12px;
 }
 

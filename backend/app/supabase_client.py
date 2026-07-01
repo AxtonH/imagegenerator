@@ -125,6 +125,7 @@ class SupabaseService:
             "user_id": user_id,
             "image_url": public,
             "storage_path": storage_path,
+            "is_saved": True,
         }
         return self.client.table("generated_images").insert(payload).execute().data[0]
 
@@ -182,8 +183,31 @@ class SupabaseService:
         return updated
 
     def history(self, user_id: str) -> list[dict]:
-        generations = self.client.table("generations").select("*, generated_images(*)").eq("user_id", user_id).order("created_at", desc=True).execute().data
-        self.log_event(user_id, "view_history")
+        generations = (
+            self.client.table("generations")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+            .data
+        )
+        images = (
+            self.client.table("generated_images")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .execute()
+            .data
+        )
+        images_by_generation: dict[str, list[dict]] = {}
+        for image in images:
+            images_by_generation.setdefault(image["generation_id"], []).append(image)
+        for generation in generations:
+            generation["generated_images"] = images_by_generation.get(generation["id"], [])
+        try:
+            self.log_event(user_id, "view_history")
+        except Exception:
+            pass
         return generations
 
     def admin_usage(self, user_id: str) -> dict:

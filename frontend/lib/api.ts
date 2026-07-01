@@ -73,10 +73,11 @@ export function shouldRememberLogin() {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers
     }
@@ -128,6 +129,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body)
     }),
+  editImage: (body: {
+    image: File;
+    prompt: string;
+    aspect_ratio: string;
+    variations: number;
+    mode: string;
+  }) => {
+    const form = new FormData();
+    form.append("image", body.image);
+    form.append("prompt", body.prompt);
+    form.append("aspect_ratio", body.aspect_ratio);
+    form.append("variations", String(body.variations));
+    form.append("mode", body.mode);
+    return request<{ generation: Generation; images: GeneratedImage[] }>("/edit-image", {
+      method: "POST",
+      body: form
+    });
+  },
   refine: (body: {
     parent_generation_id: string;
     parent_image_id?: string;

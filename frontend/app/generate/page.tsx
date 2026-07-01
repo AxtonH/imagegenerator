@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Copy, Download, Expand, Heart, RefreshCw, Save, WandSparkles } from "lucide-react";
+import { Check, Copy, Download, Expand, ImagePlus, RefreshCw, X, WandSparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { api, GeneratedImage, Generation } from "@/lib/api";
 
@@ -19,11 +19,13 @@ const progressLabels: Record<ProgressStep, string> = {
   limit: "Checking limit",
   prompt: "Enhancing prompt",
   generate: "Generating images",
-  save: "Saving library"
+  save: "Storing images"
 };
 
 export default function GeneratePage() {
   const [prompt, setPrompt] = useState("");
+  const [sourceImage, setSourceImage] = useState<File | null>(null);
+  const [sourcePreview, setSourcePreview] = useState("");
   const [sizeMode, setSizeMode] = useState<"preset" | "custom">("preset");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [customWidth, setCustomWidth] = useState(1920);
@@ -54,7 +56,9 @@ export default function GeneratePage() {
       setProgress("prompt");
       await pause(250);
       setProgress("generate");
-      const result = await api.generate({ prompt, aspect_ratio: selectedSize, variations, mode });
+      const result = sourceImage
+        ? await api.editImage({ image: sourceImage, prompt, aspect_ratio: selectedSize, variations, mode })
+        : await api.generate({ prompt, aspect_ratio: selectedSize, variations, mode });
       setProgress("save");
       setGeneration(result.generation);
       setImages(result.images);
@@ -64,12 +68,6 @@ export default function GeneratePage() {
       setLoading(false);
       setProgress("idle");
     }
-  }
-
-  async function imageAction(image: GeneratedImage, actionType: "download_image" | "save_image" | "favorite_image") {
-    const updated = await api.imageAction(image.id, actionType);
-    setImages((items) => items.map((item) => (item.id === updated.id ? updated : item)));
-    if (selectedImage?.id === updated.id) setSelectedImage(updated);
   }
 
   async function downloadImage(image: GeneratedImage, format: DownloadFormat) {
@@ -119,6 +117,30 @@ export default function GeneratePage() {
     if (selectedImage) refinementRef.current?.focus();
   }, [selectedImage]);
 
+  useEffect(() => {
+    if (!sourceImage) {
+      setSourcePreview("");
+      return;
+    }
+    const url = URL.createObjectURL(sourceImage);
+    setSourcePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [sourceImage]);
+
+  function chooseSourceImage(file: File | undefined) {
+    setError("");
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setError("Upload a PNG, JPEG, or WebP image");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Uploaded image must be 10MB or smaller");
+      return;
+    }
+    setSourceImage(file);
+  }
+
   function enhancePrompt() {
     const additions = [
       "Style: polished, high-end, presentation-ready.",
@@ -158,6 +180,32 @@ export default function GeneratePage() {
             </div>
             <textarea className="textarea prompt-textarea" id="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} required />
             <div className="warning">Do not include confidential client information unless approved.</div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="source-image">Source image for editing</label>
+            {sourcePreview ? (
+              <div className="source-image-preview">
+                <img alt="Uploaded source" src={sourcePreview} />
+                <button className="secondary-button" onClick={() => setSourceImage(null)} type="button">
+                  <X size={16} />
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label className="upload-dropzone" htmlFor="source-image">
+                <ImagePlus size={20} />
+                <span>Upload image to edit</span>
+              </label>
+            )}
+            <input
+              accept="image/png,image/jpeg,image/webp"
+              className="file-input"
+              id="source-image"
+              onChange={(event) => chooseSourceImage(event.target.files?.[0])}
+              type="file"
+            />
+            <div className="muted small-note">Optional. If uploaded, Gemini edits this image instead of generating from scratch.</div>
           </div>
 
           <SegmentedControl label="Size mode" options={sizeModes} value={sizeMode} onChange={setSizeMode} />
@@ -212,7 +260,7 @@ export default function GeneratePage() {
           {error ? <div className="error">{error}</div> : null}
           <button className="primary-button generate-button" disabled={loading} type="submit">
             <WandSparkles size={18} />
-            {loading ? "Generating..." : "Generate"}
+            {loading ? "Working..." : sourceImage ? "Edit image" : "Generate"}
           </button>
         </form>
 
@@ -248,7 +296,7 @@ export default function GeneratePage() {
                       <Expand size={18} />
                     </button>
                   </div>
-                  <ImageActions image={image} onAction={imageAction} onDownload={downloadImage} onRefine={openRefine} />
+                  <ImageActions image={image} onDownload={downloadImage} onRefine={openRefine} />
                 </article>
               ))}
             </div>
@@ -272,9 +320,9 @@ export default function GeneratePage() {
             <aside className="modal-side">
               <div>
                 <h2>Review image</h2>
-                <p className="muted">Save, favorite, export, or generate a refined version from this image.</p>
+                <p className="muted">Export this image or generate a refined version.</p>
               </div>
-              <ImageActions image={selectedImage} onAction={imageAction} onDownload={downloadImage} onRefine={openRefine} />
+              <ImageActions image={selectedImage} onDownload={downloadImage} onRefine={openRefine} />
               <form className="form" onSubmit={refineSelected}>
                 <div className="field">
                   <label htmlFor="refinement">Refine this image</label>
@@ -329,12 +377,10 @@ function SegmentedControl<T extends string | number>({
 
 function ImageActions({
   image,
-  onAction,
   onDownload,
   onRefine
 }: {
   image: GeneratedImage;
-  onAction: (image: GeneratedImage, actionType: "download_image" | "save_image" | "favorite_image") => Promise<void>;
   onDownload: (image: GeneratedImage, format: DownloadFormat) => Promise<void>;
   onRefine: (image: GeneratedImage) => void;
 }) {
@@ -342,14 +388,6 @@ function ImageActions({
 
   return (
     <div className="image-actions image-actions-expanded">
-      <button className={image.is_saved ? "action-button active" : "action-button"} onClick={() => onAction(image, "save_image")} type="button">
-        <Save size={17} />
-        Save
-      </button>
-      <button className={image.is_favorite ? "action-button active" : "action-button"} onClick={() => onAction(image, "favorite_image")} type="button">
-        <Heart size={17} />
-        Favorite
-      </button>
       <button className="action-button" onClick={() => onRefine(image)} type="button">
         <RefreshCw size={17} />
         Refine
